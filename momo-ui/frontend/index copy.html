@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <meta http-equiv=“Pragma” content=”no-cache”><meta http-equiv=“Expires” content=”-1″>
+    <meta http-equiv=“CACHE-CONTROL” content=”NO-CACHE”>
+    <title>Some HTMX</title>
+    <script src="https://unpkg.com/htmx.org@1.9.6"></script>
+    <script src="https://go-echarts.github.io/go-echarts-assets/assets/echarts.min.js"></script>
+    <script src="https://unpkg.com/htmx.org/dist/ext/sse.js"></script>
+    <link rel="stylesheet" href="src/assets/css/app.css">
+    <script type="text/javascript" >
+        let charts = new Object();
+        let eventSrc = new EventSource("https://localhost:4344/livelog",{withCredentials: true})
+        let handlers = new Object();
+        let observers = [];
+        eventSrc.onerror = (e) => {console.log("Error occurred:" + e);}
+        eventSrc.onopen = (e) => {console.log("Connection to server opened:" + e);}
+        
+        // Mutation observer - detect if we need to remove listeners from the EventSrc collection
+        function onRemove(el, callback) {
+            new MutationObserver((mutations, observer) => {
+                if(!document.body.contains(el)) {
+                    observer.disconnect();
+                    callback(el);
+                }
+            }).observe(document.body, { childList: true, subtree: true });
+        }
+        
+        function deleteFromArray(name) {
+            const updatedArray = Object.fromEntries(
+            Object.entries(charts).filter(([key]) => key !== name)
+            );
+            return updatedArray;
+        }
+        function inDOM(name){
+            console.log(document.body.contains(document.getElementById(name)));
+        }
+        function elementRemoved(e){
+            console.log(e);
+        } 
+        function printDOM() {
+            console.log(document.getElementsByTagName('body')[0].innerHTML) ;
+        }
+        function logObject(o){
+            var output="";
+            for (var property in o) {
+                output += property + ': ' + o[property]+'; ';
+            }
+            console.log(output);
+        }
+        function addChart(name, theme, renderer, jsonNotEscaped, eventNames=[], bindToEvntSource=false){
+            console.log(eventNames);
+            charts=deleteFromArray(name);
+            let chart=echarts.init(document.getElementById(name), theme, { renderer: renderer });
+            let option = jsonNotEscaped;
+            chart.setOption(option);
+            charts[name]=chart;
+            if(bindToEvntSource){
+                for (eventName of eventNames) {
+                    
+                    var handlerName = name + "_" + eventName;
+                    console.log("handlerName:" + handlerName);
+                    /*
+                    if (!(handlerName in handlers)){
+                        console.log("adding handler:" + handlerName);
+                        handlers[handlerName]= function(e){
+                            //var handlerFn = name + "_" + eventName;
+                            console.log("handlerMoño:",handlerName);
+                            logObject(chart);
+                            chart[handlerName](e.data);
+                        };
+                        console.log("handlers["+handlerName+"]:" + handlers[handlerName]);
+                    }
+                    logObject(handlers);
+                    */
+                    eventSrc.addEventListener(eventName,
+                        charts[name][handlerName],
+                        false);
+                    logObject(eventSrc);
+                    logObject(charts[name]);
+                }
+                
+                var fn = function(item){
+                    
+                    var handlerStartName = item.id;
+                    var chart=charts[handlerStartName];
+                    for (props in chart){
+                        console.log("props:", props);
+                        if (props.startsWith(handlerStartName)) {
+                            var eventName=handlerName.substring((handlerStartName.length+1));
+                            console.log("removeEventListener:", handlerName,eventName);
+                            eventSrc.removeEventListener(eventName,
+                                charts[handlerStartName][handlerName],
+                                false);
+                            //delete handlers[handlerName];
+                        }
+                        
+    
+                    }
+                    console.log("item.id:", item.id);
+                }
+                onRemove(document.getElementById(name), fn)
+            }
+            
+            return chart;
+        }
+     </script>  
+</head>
+
+<body>
+    <div id="app">
+        <div class="drawer lg:drawer-open">
+            <input id="my-drawer-2" type="checkbox" class="drawer-toggle" />
+
+            <div class="drawer-content flex flex-col items-center justify-center">
+                <div hx-ext="sse" sse-connect="https://localhost:4344/livelog" sse-swap="ping">
+                    Contents of this box will be updated in real time
+                    with every SSE message received from the chatroom.
+                </div>
+                <div class="mx-auto w-10/12 py-20 rounded-lg shadow-lg backdrop-blur-sm bg-white/10 backdrop-filter">
+                    <form id="target-form" class="main-header space-y-6" action="/">
+                        <h1 class="text-2xl antialiased">Select an item from the sidebar to get started </h1>
+                    </form>
+                </div>
+                <label for="my-drawer-2" class="btn btn-primary drawer-button lg:hidden">Open drawer</label>
+            </div>
+            <div class="drawer-side">
+                <label for="my-drawer-2" class="drawer-overlay"></label>
+                <ul class="menu p-4 w-80 min-h-full bg-base-200 text-base-content">
+                    <img id="logo" class="logo max-w-[50%]" src="src/assets/images/logo-universal.png">
+                    <div id="initial" hx-get="/initial" hx-trigger="load" hx-target="#initial" hx-swap="outerHTML"></div>
+                </ul>
+            </div>
+        </div>
+
+    </div>
+    </div>
+    <div id="modal"></div>
+</body>
+
+</html>
